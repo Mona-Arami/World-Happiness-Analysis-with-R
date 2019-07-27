@@ -2,7 +2,9 @@
 title: "World Happiness Analysis"
 author: "Mona Arami"
 date: "June, 2019"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 ---
 
 ## Introduction
@@ -111,5 +113,107 @@ ggplot(data = df15, aes(x = df15$Region, y = df15$`Happiness Score`)) +
 The table of averages and the boxplot both confirm the intuitions we had about the world map for 2015. Australia & New Zealand, North America, and Western Europe have the highest average happiness scores. Sub-Saharan Africa has the lowest average, next to Southern Asia.
 
 We can make similar boxplots for 2016 and 2017.
+```{r}
+ggplot(data = df16, aes(x = df16$Region, y = df16$`Happiness Score`)) +
+  geom_boxplot(aes(color = Region, fill = Region), alpha = 0.5) +
+  geom_point(aes(color = Region), position = position_jitter(width = .1)) +
+  labs(title = "Happiness by World Region - 2016", 
+       x = "Region", 
+       y = "Happiness Score") +
+  theme_minimal() +
+  theme(plot.title = element_text(size = rel(2.5)),
+        axis.title = element_text(size = rel(1.5)),
+        axis.text.x = element_blank())
+```
 
+```{r}
+ggplot(data = df17, aes(x = df17$Region, y = df17$Happiness.Score)) +
+  geom_boxplot(aes(color = Region, fill = Region), alpha = 0.5) +
+  geom_point(aes(color = Region), position = position_jitter(width = .1)) +
+  labs(title = "Happiness by World Region - 2017", 
+       x = "Region", 
+       y = "Happiness Score") +
+  theme_minimal() +
+  theme(plot.title = element_text(size = rel(2.5)),
+        axis.title = element_text(size = rel(1.5)),
+        axis.text.x = element_blank())
+```
+Just from these boxplots, we can tell that the average happiness scores across world regions don’t change very much from 2015-2017.
+
+Let’s look at how happiness scores changed for each country over time.
+
+```{r}
+df15$year <- "2015"
+df16$year <- "2016"
+df17$year <- "2017"
+
+names(df15)[names(df15)=="Happiness Score"] <- "score"
+names(df16)[names(df16)=="Happiness Score"] <- "score"
+names(df17)[names(df17)=="Happiness.Score"] <- "score"
+
+dfall <- rbind(select(df15,"Country", "Region", "score", "year"),
+               select(df16, "Country", "Region", "score", "year"),
+               select(df17, "Country", "Region", "score", "year"))
+
+ggplot(data = dfall) +
+  geom_line(mapping = aes(x = year, y = score, group = Country, 
+                          color = Region),
+            alpha = 0.5, show.legend = FALSE) +
+  geom_point(aes(x = year, y = score, color = Region), 
+             position = position_jitter(width = .1),
+             alpha = 0.5,
+             show.legend = FALSE) +
+  labs(title = "Worldwide Happiness Scores 2015-17", 
+       x = "Year", 
+       y = "Happiness Score") +
+  theme_minimal() +
+  theme(plot.title = element_text(size = rel(2.5)),
+        axis.title = element_text(size = rel(1.5)),
+        strip.text.x = element_text(size = rel(1.5))) +
+  facet_wrap(~ Region)
+```
+For the most part, the scores for each country do not change significantly from 2015-2017. There are very few countries whose scores decreased significantly, and fewer still whose scores increased significantly. The countries that underwent significant change, if any, were primarily in Sub-Saharan Africa or Latin America & the Caribbean. This makes sense, since countries in these regions are more subject to sudden changes in economy and political stability.
+
+To explore the factors that could be contributing to the score differences between world regions, let’s have a look at the six factors of happiness for each of these regions. We’ll use the 2015 data.
+```{r}
+# 2015
+names(df15)[names(df15)=="Economy (GDP per Capita)"] <- "Economy"
+names(df15)[names(df15)=="Health (Life Expectancy)"] <- "Health"
+names(df15)[names(df15)=="Trust (Government Corruption)"] <- "Trust"
+pairs(~ Economy+Family+Health+Freedom+Trust+Generosity, data = df15, 
+      main="Importances of the Six Factors of Happiness")
+```
+
+This pairs plot compares the importance of each of the six factors of happiness to each of the others. If there is a strong positive linear correlation between two factors, we can say that if one factor is important in evaluating a country’s overall happiness, it is likely that the other factor is important as well. Based on the plots, it seems that the importances of Economy & Health are strongly correlated, as well as Economy & Family.
+
+I was hoping to be able to draw regression lines over each of the pair plots, but couldn’t figure out how. I’ve settled with eyeballing the correlations.
+
+Let’s take a closer look at the top 10 happiest countries in 2015 and how much each of the six factors contributed toward their overall happiness scores. For this, a stacked bar plot would be a useful visualization.
+
+```{r}
+dfwide <- df15 %>%
+  head(10)
+
+dflong <- gather(dfwide, Factor, `Importance of Factor`, Economy:Generosity, factor_key=TRUE)
+
+ggplot(data = dflong) +
+  geom_bar(stat = "identity", 
+           aes(x = Country, y = `Importance of Factor`, fill = Factor)) +
+  coord_flip() +
+  theme_minimal() +
+  theme(legend.position = "top") +
+  labs(title = "The Six Factors of Happiness in the Ten Happiest Countries") +
+  theme(plot.title = element_text(size = rel(1.5)),
+        axis.title = element_text(size = rel(1.5)))
+```
+In general, Economy and Family seem to the the two most important factors of happiness in these countries.  Trust (absence of corruption) and Generosity are the least important.
+
+These six factors don’t add up to the overall happiness score for each country in the bar plot because they should just be thought of as weights and the ‘Dystopian Residual’ isn’t taken into account. More information on what the ‘Dystopian Residual’ is can be found in the data overview on Kaggle
+
+## Conclusion
+This analysis illustrated that the world’s happiest countries are primarily in Western Europe (especially Northern Europe), North America, and Australia & New Zealand. These averages did not change very much from 2015-2017. It also revealed that Economy (GDP per capita) is the most important factor in evaluating a country’s happiness. Unsurprisingly, the happiest countries and world regions generally tended to be ones with strong and stable economies. The importance of Economy is also strongly positively correlated with those of Family and Health. This is expected, since more economic stability and higher GDP per capita generally encourages stable and comfortable family life as well as increases the availability of proper medical resources and healthcare. These factors then weigh more when determining overall happiness.
+
+I would also hypothesize that these three factors–Economy, Family, and Health–tend to be particularly important because they directly affect individuals living in these countries. Everyone is affected by the state of the economy, especially since it holds direct sway over the availability and security of jobs and the flow of money. Families are the nucleus of home life for most individuals, and Health also affects people on the level of individuals. Consequently, these are very concrete factors and therefore have more influence on the happiness score gauged by individuals.
+
+Sub-Saharan Africa and Southern Asia could definitely use a lift, but overall, the world doesn’t seem to be doing too badly. Here’s to the future!
 
