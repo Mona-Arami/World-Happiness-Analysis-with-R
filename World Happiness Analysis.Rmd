@@ -1,0 +1,115 @@
+---
+title: "World Happiness Analysis"
+author: "Mona Arami"
+date: "June, 2019"
+output: html_document
+---
+
+## Introduction
+This is an analysis of the World Happiness Report from 2015-2017, looking at worldwide and region-wise trends in happiness score as well as patterns in the importance of the six factors of happiness in determining overall happiness in each country. The data comes from the Gallup World Poll.
+
+The three datasets used in this analysis are available on [Kaggle](https://www.kaggle.com/unsdsn/world-happiness/data).
+
+## Data Import and First Look
+
+Library imports:
+```{r}
+library(ggplot2)
+library(dplyr)
+library(RColorBrewer)
+library(tidyr)
+library(knitr)
+library(readr)
+```
+##### Data import: There are three separate datasets - 2015, 2016, and 2017.
+```{r}
+df15 <- read_csv("2015.csv")
+df16 <- read_csv("2016.csv")
+df17 <- read_csv("2017.csv")
+```
+
+2015 includes 158 countries. 2016 includes 157 countries. 2017 includes 155 countries.
+
+We’re interested in the Country and Region columns of each dataset in order to group overall happiness scores by country and world region. (Note: 2017 does not have a region column, so we can create one by joining the region data from another year’s dataset by country ID and filling in any missing cells manually). Beyond overall happiness score, country, and region, we’re also interested in the columns for Economy (GDP per capita), Family, Health (Life Expectancy), Freedom, Trust (Absence of Government Corruption), and Generosity. These are the six factors of happiness included in the survey. The values in these columns indicate how much each of the factors contributed to the overall happiness score for each country, i.e. how important they were.
+
+Here’s a peek at the relevant columns in the 2015 dataset:
+```{r}
+df15 <- df15 %>% select(Country, Region, `Happiness Rank`, `Happiness Score`, `Economy (GDP per Capita)`, Family, `Health (Life Expectancy)`, Freedom, `Trust (Government Corruption)`, Generosity)
+kable(head(df15))
+```
+```{r}
+df16 <- df16 %>% select(Country, Region, `Happiness Rank`, `Happiness Score`, `Economy (GDP per Capita)`, Family, `Health (Life Expectancy)`, Freedom, `Trust (Government Corruption)`, Generosity)
+kable(head(df16))
+```
+```{r}
+df17 <- left_join(df17, select(df16, "Country", "Region"), by = "Country")
+df17$Region[71] <- "Eastern Asia"
+df17$Region[33] <- "Eastern Asia"
+df17$Region[155] <- "Sub-Saharan Africa"
+df17$Region[113] <- "Sub-Saharan Africa"
+df17$Region[139] <- "Sub-Saharan Africa"
+df17 <- df17 %>% select(Country, Region, Happiness.Rank, Happiness.Score, Economy..GDP.per.Capita., Family, Health..Life.Expectancy., Freedom, Trust..Government.Corruption., Generosity)
+kable(head(df17))
+```
+It looks like the rankings don’t shift around very much for the world’s happiest countries. 
+
+## Data Analysis
+
+Now for the fun stuff.
+
+Here’s a world map color-coded by each country’s overall happiness score in 2015.
+
+```{r}
+worldmap <- map_data("world")
+names(worldmap)[names(worldmap)=="region"] <- "Country"
+worldmap$Country[worldmap$Country == "USA"] <- "United States"
+happy_world <- df15 %>%
+  full_join(worldmap, by = "Country")
+
+map_theme <- theme(
+    axis.title.x = element_blank(),
+    axis.text.x  = element_blank(),
+    axis.ticks.x = element_blank(),
+    axis.title.y = element_blank(),
+    axis.text.y  = element_blank(),
+    axis.ticks.y = element_blank(),
+    panel.background = element_rect(fill = "white"))
+
+ggplot(data = happy_world, mapping = aes(x = long, y = lat, group = group)) +
+  geom_polygon(aes(fill = `Happiness Score`))  +
+  scale_fill_continuous(low="thistle2", high="darkred", na.value="snow2") +
+  coord_quickmap() +
+  labs(title = "Happiness Around the World - 2015") +
+  map_theme
+```
+The darker the red, the higher the happiness score. Regions in gray do not have happiness data. The happiest regions of the world appear to be in Europe, North and South America, Australia and New Zealand. Africa appears to contain the lowest overall happiness scores.
+
+Let’s have a look at the average happiness of each world region for 2015.
+
+```{r}
+dfavg <- df15 %>%
+  select(Region, `Happiness Score`) %>%
+  group_by(Region) %>%
+  summarize(Average = mean(`Happiness Score`)) %>%
+  arrange(desc(Average))
+kable(dfavg)
+```
+We can visualize these averages with a boxplot:
+
+```{r}
+ggplot(data = df15, aes(x = df15$Region, y = df15$`Happiness Score`)) +
+  geom_boxplot(aes(color = Region, fill = Region), alpha = 0.5) +
+  geom_point(aes(color = Region), position = position_jitter(width = .1)) +
+  labs(title = "Happiness by World Region - 2015", 
+       x = "Region", 
+       y = "Happiness Score") +
+  theme_minimal() +
+  theme(plot.title = element_text(size = rel(2.5)),
+        axis.title = element_text(size = rel(1.5)),
+        axis.text.x = element_blank())
+```
+The table of averages and the boxplot both confirm the intuitions we had about the world map for 2015. Australia & New Zealand, North America, and Western Europe have the highest average happiness scores. Sub-Saharan Africa has the lowest average, next to Southern Asia.
+
+We can make similar boxplots for 2016 and 2017.
+
+
